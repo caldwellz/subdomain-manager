@@ -1,17 +1,19 @@
-const { NODE_ENV = "development" } = process.env;
-require("dotenv").config({
-  path: [".env", `.env.${NODE_ENV}`, ".env.local", `.env.${NODE_ENV}.local`],
+const { NODE_ENV = 'development' } = process.env;
+require('dotenv').config({
+  path: [`.env.${NODE_ENV}.local`, '.env.local', `.env.${NODE_ENV}`, '.env'],
 });
 
-const { APP_HOST = "0.0.0.0", APP_PORT = 4242 } = process.env;
-const express = require("express");
-const helmet = require("helmet");
+const { APP_HOST, APP_PORT } = process.env;
+const express = require('express');
+const helmet = require('helmet');
 const app = express();
 
 app.use(helmet());
 
-app.get("/", (req, res) => {
-  res.send("Hello world!");
+app.use('/v1', require('./v1'));
+
+app.use((req, res) => {
+  res.sendStatus(404);
 });
 
 app.listen(APP_PORT, APP_HOST, () => {
