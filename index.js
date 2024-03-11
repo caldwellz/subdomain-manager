@@ -4,6 +4,7 @@ require('dotenv').config({
 });
 
 const { APP_HOST, APP_PORT } = process.env;
+const db = require('./db.js');
 const express = require('express');
 const helmet = require('helmet');
 const app = express();
@@ -16,6 +17,7 @@ app.use((req, res) => {
   res.sendStatus(404);
 });
 
-app.listen(APP_PORT, APP_HOST, () => {
+app.listen(APP_PORT, APP_HOST, async () => {
+  await db.open();
   console.log(`Server running on ${APP_HOST}:${APP_PORT} in ${NODE_ENV} mode.`);
 });
