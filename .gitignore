@@ -1,0 +1,6 @@
+# NodeJS package cache
+node_modules
+package-lock.json
+
+# Environment secrets and local config
+*.local
