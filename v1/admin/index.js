@@ -8,6 +8,7 @@ router.use((req, res, next) => {
   res.sendStatus(404);
 });
 
+router.use('/domains', require('./domains.js'));
 router.use('/keys', require('./keys.js'));
 
 module.exports = router;

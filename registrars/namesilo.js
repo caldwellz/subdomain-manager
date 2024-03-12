@@ -1,6 +1,6 @@
 const { NAMESILO_API_KEY, NAMESILO_PAYMENT_ID } = process.env;
 const { XMLParser } = require('fast-xml-parser');
-const { apiKeyValidator } = require('../lib');
+const { apiKeyValidator, splitHost } = require('../lib');
 
 if (!apiKeyValidator.test(NAMESILO_API_KEY)) {
   throw new Error('Invalid NAMESILO_API_KEY. Create a .env.local file and fill it in.');
@@ -41,9 +41,7 @@ async function addAccountFunds(amount) {
 
 async function dnsAddRecord(record) {
   const { type: rrtype, host, value: rrvalue, distance: rrdistance = 10, ttl: rrttl = 7207 } = record;
-  const hostParts = host.split('.');
-  const rrhost = hostParts.slice(0, -2).join('.');
-  const domain = hostParts.slice(-2).join('.');
+  const { rrhost, domain } = splitHost(host);
   const { record_id } = await requestV1('dnsAddRecord', { domain, rrtype, rrhost, rrvalue, rrdistance, rrttl });
   return { ...record, record_id, distance: rrdistance, ttl: rrttl };
 }
