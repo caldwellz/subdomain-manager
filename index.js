@@ -4,7 +4,7 @@ require('dotenv').config({
 });
 
 const { APP_HOST, APP_PORT } = process.env;
-const { celebrate, errors: celebrateErrorHandler, Joi } = require('celebrate');
+const { celebrate, Joi, isCelebrateError } = require('celebrate');
 const User = require('./models/User.js');
 const db = require('./db.js');
 const express = require('express');
@@ -17,7 +17,7 @@ app.use(helmet(), express.json());
 app.use(
   celebrate({
     headers: Joi.object({
-      'x-api-key': Joi.string().hex().length(32).default(''),
+      'x-api-key': Joi.string().hex().length(32).required(),
     }).unknown(true),
   }),
   async (req, res, next) => {
@@ -28,13 +28,8 @@ app.use(
     const { 'x-api-key': apiKeys } = req.headers;
     req.user = await User.findOne({ apiKeys });
     if (!req.user?.active) {
-      // Local development bypass
-      if (NODE_ENV === 'development' && req.ip === '127.0.0.1') {
-        req.user = new User({ roles: ['admin', 'user'], username: '' });
-      } else {
-        console.log(`Received invalid API key '${apiKeys}' from ${req.ip}`);
-        return res.status(401).json({ success: false, error: 'Unauthenticated', message: 'Invalid API key' });
-      }
+      console.log(`Received invalid API key '${apiKeys}' from ${req.ip}`);
+      return res.status(401).json({ success: false, error: 'Unauthenticated', message: 'Invalid API key' });
     }
     next();
   }
@@ -47,8 +42,18 @@ app.use((req, res) => {
   res.status(404).json({ success: false, error: 'Not Found' });
 });
 
-// Validation and catch-all error handlers
-app.use(celebrateErrorHandler(), (err, req, res, next) => {
+// Catch-all error handlers
+app.use((err, req, res, next) => {
+  // Return validation errors as a 400 with short but helpful messages
+  if (isCelebrateError(err)) {
+    const details = [];
+    for (const [validationSource, { message }] of err.details.entries()) {
+      details.push(`${validationSource}: ${message.replaceAll('"', "'")}`);
+    }
+    return res.status(400).json({ success: false, error: 'Bad Request', details });
+  }
+
+  // For everything else, log it and return an opaque server error
   console.error('500 Server Error:', err);
   res.status(500).json({ success: false, error: 'Internal Server Error' });
 });
