@@ -6,12 +6,19 @@ require('dotenv').config({
 const { APP_HOST, APP_PORT } = process.env;
 const { celebrate, Joi, isCelebrateError } = require('celebrate');
 const User = require('./models/User.js');
+const compression = require('./compression.js');
 const db = require('./db.js');
 const express = require('express');
 const helmet = require('helmet');
 const app = express();
 
-app.use(helmet(), express.json());
+// Add an X-Response-Time header in dev mode
+if (NODE_ENV === 'development') {
+  const responseTime = require('response-time');
+  app.use(responseTime());
+}
+
+app.use(helmet(), express.json(), compression());
 
 // Content type and API key validation hooks
 app.use(
