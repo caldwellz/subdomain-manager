@@ -3,12 +3,6 @@ const { Router } = require('express');
 const User = require('../../models/User.js');
 const router = Router();
 
-function transformUser(user) {
-  // Rename the id and omit passwordHash and apiKeys
-  const { _id: id, username, roles, active } = user;
-  return { id, username, roles, active };
-}
-
 router.get(
   '/:userId',
   celebrate({
@@ -20,7 +14,7 @@ router.get(
     const { userId } = req.params;
     const existingUser = await User.findOne({ _id: userId }).exec();
     if (!existingUser) return next(); // Fall back to 404 handler
-    res.json({ success: true, user: transformUser(existingUser) });
+    res.json({ success: true, user: existingUser.normalize() });
   }
 );
 
@@ -42,7 +36,7 @@ router.get(
     if (_id) queryParams._id = _id;
     const existingUser = await User.findOne(queryParams).exec();
     if (!existingUser) return next(); // Fall back to 404 handler
-    res.json({ success: true, user: transformUser(existingUser) });
+    res.json({ success: true, user: existingUser.normalize() });
   }
 );
 
@@ -65,7 +59,7 @@ router.put(
     const apiKey = await user.addAPIKey();
     await user.updatePassword(password);
     await user.save();
-    res.json({ success: true, apiKey, user: transformUser(user) });
+    res.json({ success: true, apiKey, user: user.normalize() });
   }
 );
 
@@ -93,7 +87,7 @@ router.patch(
     Object.assign(user, changes);
     if (password) await user.updatePassword(password);
     await user.save();
-    res.json({ success: true, user: transformUser(user) });
+    res.json({ success: true, user: user.normalize() });
   }
 );
 

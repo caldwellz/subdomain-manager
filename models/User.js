@@ -30,6 +30,12 @@ userSchema.methods.hasRole = function (role) {
   return this.roles.includes(role);
 };
 
+/** Returns a bare object that contains the renamed id and omits the passwordHash, apiKeys, and timestamps. */
+userSchema.methods.normalize = function () {
+  const { _id, active, roles, username } = this;
+  return { id: _id.toString(), active, roles, username };
+};
+
 userSchema.methods.updatePassword = async function (password) {
   this.passwordHash = await argon2.hash(password, {
     timeCost,
