@@ -1,37 +1,45 @@
-const { STATIC_IPS = '' } = process.env;
 const { isReservedSubdomain, getPublicIP } = require('../../lib');
 const { namesilo } = require('../../registrars');
 const { Router } = require('express');
-const db = require('../../db.js');
-const subdomainTable = db.table('Subdomains');
+const Subdomain = require('../../models/Subdomain.js');
 const router = Router();
-const staticIPsList = STATIC_IPS.split(',');
 
-router.get('/refresh', async (req, res) => {
+router.post('/claimUnownedSubdomains', async (req, res) => {
+  const allSubdomains = {};
+  const claimedSubdomains = {};
+  const owner = req.user._id;
   const publicIP = await getPublicIP();
   const domainInfo = await namesilo.getAllDomainInfo();
   const nonForwardedDomains = Object.keys(domainInfo).filter((name) => domainInfo[name].traffic_type === 'Custom DNS');
-  const dnsRecords = await namesilo.dnsListRecords(nonForwardedDomains);
-  const addrRecords = dnsRecords.filter(({ type }) => type.startsWith('A'));
-  const subdomains = {};
-  for (const rec of addrRecords) {
-    const { record_id, type, host, value } = rec;
-    subdomains[host] = subdomains[host] ?? [];
-    const local = value === publicIP;
-    const static = staticIPsList.includes(value);
-    const item = {
-      record_id,
-      type,
-      value,
-      local,
-      static,
-      allowedChangeRoles:
-        local || static || isReservedSubdomain(host) ? ['admin', 'superadmin'] : ['user', 'admin', 'superadmin'],
-    };
-    subdomains[host].push(item);
+  for (const domain of nonForwardedDomains) {
+    const dnsRecords = await namesilo.dnsListRecords(domain);
+    for (const rec of dnsRecords) {
+      const { record_id, host, type, value } = rec;
+      if (!allSubdomains[host]) {
+        allSubdomains[host] = await Subdomain.findOne({ host });
+        if (!allSubdomains[host]) {
+          claimedSubdomains[host] = new Subdomain({
+            active: true,
+            dnsRecords: [],
+            host,
+            owner,
+            reserved: isReservedSubdomain(host),
+          });
+          allSubdomains[host] = claimedSubdomains[host];
+        }
+      }
+      if (!claimedSubdomains[host]) continue;
+      const local = value === publicIP;
+      claimedSubdomains[host].dnsRecords.push({
+        local,
+        record_id,
+        type,
+        value,
+      });
+    }
   }
-  await Promise.all(Object.keys(subdomains).map((host) => subdomainTable.put(host, subdomains[host])));
-  res.json(subdomains);
+  await Promise.all(Object.values(claimedSubdomains).map((sub) => sub.save()));
+  res.json({ success: true, subdomains: Object.keys(claimedSubdomains) });
 });
 
 module.exports = router;

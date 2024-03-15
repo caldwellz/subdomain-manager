@@ -2,8 +2,8 @@ const { NAMESILO_API_KEY, NAMESILO_PAYMENT_ID } = process.env;
 const { XMLParser } = require('fast-xml-parser');
 const { splitHost } = require('../lib');
 
-if (!/^[A-Fa-f0-9]{22}$/.test(NAMESILO_API_KEY)) {
-  throw new Error('Invalid NAMESILO_API_KEY. Create a .env.local file and fill it in.');
+if (!NAMESILO_API_KEY) {
+  throw new Error('NAMESILO_API_KEY not specified. Create a .env.local file and fill it in.');
 }
 
 const parser = new XMLParser({
@@ -13,13 +13,13 @@ const parser = new XMLParser({
   textNodeName: '_text',
 });
 
-// Namesilo only allows 2 requests per second, so we have to rate-limit ourselves
+// Namesilo only allows ~4-5 requests per second, so we have to rate-limit ourselves
 const resolveQueue = [];
 async function rateLimitedFetch(...params) {
   await new Promise((resolve) => resolveQueue.push(resolve));
   return await fetch(...params);
 }
-setInterval(() => resolveQueue.shift()?.(), 501);
+setInterval(() => resolveQueue.shift()?.(), 251);
 
 async function requestV1(operation, params = {}) {
   const realParams = { version: 1, type: 'xml', key: NAMESILO_API_KEY, ...params };
