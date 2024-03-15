@@ -1,13 +1,10 @@
-const { DB_PATH_PREFIX } = process.env;
-const { Level } = require('level');
+const { DB_PREFIX, DB_HOST, DB_PORT } = process.env;
+const mongoose = require('mongoose');
 
-const db = new Level(`${DB_PATH_PREFIX}/subdomain-manager`);
-
-if (!db.supports.encodings.json || !db.supports.encodings.utf8 || !db.supports.permanence || !db.supports.promises) {
-  throw new Error(`Missing required database features! Support manifest: ${JSON.stringify(db.supports, null, 4)}`);
-}
-
-module.exports = {
-  open: () => db.open(),
-  table: (name, valueEncoding = 'json') => db.sublevel(name, { separator: '\x1D', keyEncoding: 'utf8', valueEncoding }),
+mongoose.open = async function () {
+  const connectionStr = `mongodb://${DB_HOST}:${DB_PORT}/${DB_PREFIX}subdomain_manager`;
+  await mongoose.connect(connectionStr);
+  console.log('Successfully connected to', connectionStr);
 };
+
+module.exports = mongoose;

@@ -4,6 +4,3 @@ package-lock.json
 
 # Environment secrets and local config
 *.local
-
-# Local testing database
-db/
