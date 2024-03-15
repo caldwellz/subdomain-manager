@@ -4,44 +4,53 @@ require('dotenv').config({
 });
 
 const { APP_HOST, APP_PORT } = process.env;
-const { apiKeyValidator } = require('./lib.js');
+const { celebrate, errors: celebrateErrorHandler, Joi } = require('celebrate');
+const User = require('./models/User.js');
 const db = require('./db.js');
 const express = require('express');
 const helmet = require('helmet');
 const app = express();
-const table = db.table('ApiKeys');
 
-app.use(helmet());
+app.use(helmet(), express.json());
 
-// Content type and API key validation hook
-app.use(async (req, res, next) => {
-  // We only return JSON for now
-  if (!req.accepts('json')) return res.sendStatus(406);
+// Content type and API key validation hooks
+app.use(
+  celebrate({
+    headers: Joi.object({
+      'x-api-key': Joi.string().hex().length(32).default(''),
+    }).unknown(true),
+  }),
+  async (req, res, next) => {
+    // We only return JSON for now
+    if (!req.accepts('json')) return res.sendStatus(406);
 
-  // Local development bypass
-  if (NODE_ENV === 'development' && req.ip === '127.0.0.1') {
-    req.user = { active: true, role: 'superadmin' };
-    return next();
+    // Check for a valid apiKey
+    const { 'x-api-key': apiKeys } = req.headers;
+    req.user = await User.findOne({ apiKeys });
+    if (!req.user?.active) {
+      // Local development bypass
+      if (NODE_ENV === 'development' && req.ip === '127.0.0.1') {
+        req.user = new User({ roles: ['admin', 'user'], username: '' });
+      } else {
+        console.log(`Received invalid API key '${apiKeys}' from ${req.ip}`);
+        return res.status(401).json({ success: false, error: 'Unauthenticated', message: 'Invalid API key' });
+      }
+    }
+    next();
   }
-
-  // Check for a valid apiKey
-  const apiKey = String(req.query.apiKey);
-  try {
-    if (apiKeyValidator.test(apiKey)) {
-      req.user = await table.get(apiKey); // This will throw a LEVEL_NOT_FOUND error if the key doesn't exist
-      if (!req.user.active) return res.sendStatus(403);
-      return next();
-    } else console.log(`Received invalid API key '${apiKey}' from ${req.ip}.`);
-  } catch (err) {
-    console.log(`Received unknown API key '${apiKey}' from ${req.ip}.`);
-  }
-  res.sendStatus(401);
-});
+);
 
 app.use('/v1', require('./v1'));
 
+// Route not found handler
 app.use((req, res) => {
-  res.sendStatus(404);
+  res.status(404).json({ success: false, error: 'Not Found' });
+});
+
+// Validation and catch-all error handlers
+app.use(celebrateErrorHandler(), (err, req, res, next) => {
+  console.error('500 Server Error:', err);
+  res.status(500).json({ success: false, error: 'Internal Server Error' });
 });
 
 app.listen(APP_PORT, APP_HOST, async () => {

@@ -1,8 +1,8 @@
 const { NAMESILO_API_KEY, NAMESILO_PAYMENT_ID } = process.env;
 const { XMLParser } = require('fast-xml-parser');
-const { apiKeyValidator, splitHost } = require('../lib');
+const { splitHost } = require('../lib');
 
-if (!apiKeyValidator.test(NAMESILO_API_KEY)) {
+if (!/^[A-Fa-f0-9]{22}$/.test(NAMESILO_API_KEY)) {
   throw new Error('Invalid NAMESILO_API_KEY. Create a .env.local file and fill it in.');
 }
 

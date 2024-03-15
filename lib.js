@@ -1,6 +1,8 @@
 const { IP_ECHO_SERVICE = 'https://ident.me/', RESERVED_SUBDOMAINS = '' } = process.env;
-const { v4: uuid } = require('uuid');
+const crypto = require('node:crypto');
+const { promisify } = require('node:util');
 
+const randomBytes = promisify(crypto.randomBytes);
 const reservedSubdomainsList = RESERVED_SUBDOMAINS.split(',');
 
 async function getPublicIP() {
@@ -16,6 +18,12 @@ async function getPublicIP() {
   return ip;
 }
 
+/** Returns a string of random hex characters with an even length >= charCount. */
+async function randomHex(charCount) {
+  const bytes = await randomBytes(Math.round(charCount / 2));
+  return bytes.toString('hex');
+}
+
 function splitHost(host) {
   const hostParts = host.split('.');
   const rrhost = hostParts.slice(0, -2).join('.');
@@ -24,9 +32,9 @@ function splitHost(host) {
 }
 
 module.exports = {
-  apiKeyValidator: /^[A-Fa-f0-9]{22}/,
-  genApiKey: () => uuid().replaceAll('-', '').slice(0, 22),
+  genApiKey: () => randomHex(32),
   getPublicIP,
   isReservedSubdomain: (host) => reservedSubdomainsList.includes(splitHost(host).rrhost),
+  randomHex,
   splitHost,
 };
